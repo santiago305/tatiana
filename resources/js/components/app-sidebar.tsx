@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import { Bell, CreditCard, LayoutGrid, Users, Wifi } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -22,29 +22,44 @@ const mainNavItems: NavItem[] = [
         href: dashboard(),
         icon: LayoutGrid,
     },
+    {
+        title: 'Clientes',
+        href: dashboard({ query: { section: 'clientes' } }),
+        icon: Users,
+    },
+    {
+        title: 'Pagos',
+        href: dashboard({ query: { section: 'pagos' } }),
+        icon: CreditCard,
+    },
+    {
+        title: 'Notificaciones',
+        href: dashboard({ query: { section: 'notificaciones' } }),
+        icon: Bell,
+    },
 ];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
+const footerNavItems: NavItem[] = [];
 
 export function AppSidebar() {
     return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+        <Sidebar
+            collapsible="icon"
+            variant="inset"
+            className="group-data-[variant=inset]:p-3"
+        >
+            <SidebarHeader className="rounded-2xl border border-sidebar-border bg-white/95 p-3 shadow-sm">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            className="h-14 rounded-xl"
+                        >
                             <Link href={dashboard()} prefetch>
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                                    <Wifi className="h-4 w-4" />
+                                </div>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -52,11 +67,11 @@ export function AppSidebar() {
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
+            <SidebarContent className="mt-3 rounded-2xl border border-sidebar-border bg-white p-2 shadow-sm">
                 <NavMain items={mainNavItems} />
             </SidebarContent>
 
-            <SidebarFooter>
+            <SidebarFooter className="mt-3 rounded-2xl border border-sidebar-border bg-white p-2 shadow-sm">
                 <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>

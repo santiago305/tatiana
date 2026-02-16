@@ -16,6 +16,10 @@ export function NavFooter({
 }: ComponentPropsWithoutRef<typeof SidebarGroup> & {
     items: NavItem[];
 }) {
+    if (!items.length) {
+        return null;
+    }
+
     return (
         <SidebarGroup
             {...props}
@@ -27,7 +31,7 @@ export function NavFooter({
                         <SidebarMenuItem key={item.title}>
                             <SidebarMenuButton
                                 asChild
-                                className="text-neutral-600 hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100"
+                                className="text-neutral-500 hover:bg-orange-50 hover:text-orange-600"
                             >
                                 <a
                                     href={toUrl(item.href)}
