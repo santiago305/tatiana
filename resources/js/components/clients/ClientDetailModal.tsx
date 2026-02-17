@@ -5,8 +5,8 @@ import { Wifi, WifiOff, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useGestor } from '@/context/GestorContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useGestor } from '@/context/GestorContext';
 import type { ClientWithStatus } from '@/types/client';
 
 interface Props {
@@ -48,7 +48,7 @@ export const ClientDetailModal = ({ open, onClose, client }: Props) => {
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-lg max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <DialogTitle className="text-lg">{client.name}</DialogTitle>
             <Badge className={`${statusClasses[client.status]} border text-xs`}>
               {statusLabels[client.status]}
@@ -92,7 +92,7 @@ export const ClientDetailModal = ({ open, onClose, client }: Props) => {
                     </span>
                     <button
                       onClick={() => toggleService(client.id)}
-                      className={`ml-auto text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                      className={`ml-auto text-xs px-3 py-1 rounded-full font-medium transition-colors cursor-pointer ${
                         client.isServiceActive
                           ? 'bg-destructive/10 text-destructive hover:bg-destructive/20'
                           : 'bg-success/10 text-success hover:bg-success/20'
