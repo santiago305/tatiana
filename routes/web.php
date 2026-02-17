@@ -17,4 +17,8 @@ Route::get('clients', function () {
     return Inertia::render('clients');
 })->middleware(['auth'])->name('clients');
 
+Route::get('pagos', function () {
+    return Inertia::render('pagos');
+})->middleware(['auth'])->name('pagos');
+
 require __DIR__.'/settings.php';

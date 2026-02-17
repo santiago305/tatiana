@@ -29,7 +29,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Pagos',
-        href: dashboard({ query: { section: 'pagos' } }),
+        href: '/pagos',
         icon: CreditCard,
     },
     {

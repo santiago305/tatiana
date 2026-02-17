@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GestorProvider, useGestor } from '@/context/GestorContext';
 import AppLayout from '@/layouts/app-layout';
-import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
 import { ClientDetailModal } from '@/components/clients/ClientDetailModal';
 import { ClientFormModal } from '@/components/clients/ClientFormModal';
@@ -75,7 +74,7 @@ const ClientsContent = () => {
   };
 
   const handlePayment = (clientId: string) => {
-    router.get(dashboard.url({ query: { section: 'pagos', clientId } }));
+    router.get('/pagos', { clientId });
   };
 
   return (
