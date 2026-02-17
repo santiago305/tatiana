@@ -22,5 +22,6 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call(MassiveClientsSeeder::class);
+        $this->call(MassivePaymentsSeeder::class);
     }
 }

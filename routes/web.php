@@ -18,6 +18,7 @@ Route::middleware(['auth'])->group(function (): void {
 
     Route::get('clients', [ClientController::class, 'page'])->name('clients');
     Route::get('api/clients', [ClientController::class, 'index'])->name('api.clients.index');
+    Route::get('api/clients/{client}', [ClientController::class, 'show'])->name('api.clients.show');
     Route::post('api/clients', [ClientController::class, 'store'])->name('api.clients.store');
     Route::put('api/clients/{client}', [ClientController::class, 'update'])->name('api.clients.update');
     Route::delete('api/clients/{client}', [ClientController::class, 'destroy'])->name('api.clients.destroy');

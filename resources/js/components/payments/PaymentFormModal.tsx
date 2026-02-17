@@ -1,7 +1,7 @@
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Search, Calendar, Wifi, DollarSign } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,16 +25,91 @@ export const PaymentFormModal = ({ open, onClose, preSelectedClientId }: Props) 
   const [selectedClient, setSelectedClient] = useState<ClientWithStatus | null>(
     preSelectedClientId ? clients.find(c => c.id === preSelectedClientId) || null : null
   );
+  const [allowAutoPreselect, setAllowAutoPreselect] = useState(true);
   const [amount, setAmount] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [searchResults, setSearchResults] = useState<ClientWithStatus[]>([]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return [];
-    const q = search.toLowerCase();
-    return clients.filter(c =>
-      c.name.toLowerCase().includes(q) || c.dni.includes(q) || c.phone.includes(q)
-    ).slice(0, 5);
-  }, [search, clients]);
+  const readCsrf = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
+  useEffect(() => {
+    if (!search.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const params = new URLSearchParams({
+            search: search.trim(),
+            per_page: '5',
+            page: '1',
+          });
+          const response = await fetch(`/api/clients?${params.toString()}`, {
+            credentials: 'same-origin',
+            signal: controller.signal,
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': readCsrf() },
+          });
+          if (!response.ok) return;
+          const payload = (await response.json()) as { data: ClientWithStatus[] };
+          setSearchResults(payload.data ?? []);
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            console.error('No se pudo buscar clientes', error);
+          }
+        }
+      })();
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
+
+  useEffect(() => {
+    if (!allowAutoPreselect || !preSelectedClientId) return;
+    const preselected = clients.find(c => c.id === preSelectedClientId) || null;
+    setSelectedClient(preselected);
+    if (preselected) {
+      setAmount(preselected.monthlyAmount.toFixed(2));
+      setShowResults(false);
+      setSearch('');
+    }
+  }, [allowAutoPreselect, clients, preSelectedClientId]);
+
+  useEffect(() => {
+    if (!allowAutoPreselect || !preSelectedClientId || selectedClient) return;
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/clients/${preSelectedClientId}`, {
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': readCsrf(),
+          },
+        });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { data: ClientWithStatus };
+        if (!payload?.data) return;
+        setSelectedClient(payload.data);
+        setAmount(payload.data.monthlyAmount.toFixed(2));
+        setShowResults(false);
+        setSearch('');
+      } catch (error) {
+        console.error('No se pudo cargar cliente preseleccionado', error);
+      }
+    })();
+  }, [allowAutoPreselect, preSelectedClientId, selectedClient]);
+
+  useEffect(() => {
+    if (open) {
+      setAllowAutoPreselect(true);
+    }
+  }, [open, preSelectedClientId]);
 
   const handleSelect = (client: ClientWithStatus) => {
     setSelectedClient(client);
@@ -81,9 +156,9 @@ export const PaymentFormModal = ({ open, onClose, preSelectedClientId }: Props) 
                   className="pl-9"
                 />
               </div>
-              {showResults && filtered.length > 0 && (
+              {showResults && searchResults.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
-                  {filtered.map(c => (
+                  {searchResults.map(c => (
                     <button
                       key={c.id}
                       onClick={() => handleSelect(c)}
@@ -108,7 +183,13 @@ export const PaymentFormModal = ({ open, onClose, preSelectedClientId }: Props) 
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold text-sm">{selectedClient.name}</h4>
-                  <button onClick={() => setSelectedClient(null)} className="text-xs text-primary hover:underline">
+                  <button
+                    onClick={() => {
+                      setAllowAutoPreselect(false);
+                      setSelectedClient(null);
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
                     Cambiar
                   </button>
                 </div>

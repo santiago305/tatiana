@@ -1,13 +1,25 @@
-import { addMonths, format, differenceInDays, parseISO, addDays } from 'date-fns';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { addMonths, differenceInDays, format, parseISO } from 'date-fns';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Client, Payment, Note, ClientWithStatus, ClientStatus } from '@/types/client';
+import type { Client, ClientStatus, ClientWithStatus, Note, Payment } from '@/types/client';
+
+interface PaginationMeta {
+  currentPage: number;
+  lastPage: number;
+  perPage: number;
+  total: number;
+}
 
 interface GestorContextType {
   clients: ClientWithStatus[];
   clientsLoading: boolean;
+  clientsMeta: PaginationMeta;
   payments: Payment[];
+  paymentsLoading: boolean;
+  paymentsMeta: PaginationMeta;
   notes: Note[];
+  fetchClientsPage: (page?: number, search?: string) => void;
+  fetchPaymentsPage: (page?: number) => void;
   addClient: (c: Omit<Client, 'id'>) => void;
   updateClient: (c: Client) => void;
   deleteClient: (id: string) => void;
@@ -20,9 +32,9 @@ interface GestorContextType {
   getAlerts: () => ClientWithStatus[];
 }
 
-type ApiResponse<T> = {
-  data: T;
-};
+type ApiResponse<T> = { data: T; meta?: { current_page: number; last_page: number; per_page: number; total: number } };
+
+const DEFAULT_META: PaginationMeta = { currentPage: 1, lastPage: 1, perPage: 15, total: 0 };
 
 const GestorContext = createContext<GestorContextType | null>(null);
 
@@ -31,6 +43,38 @@ export const useGestor = () => {
   if (!ctx) throw new Error('useGestor must be used within GestorProvider');
   return ctx;
 };
+
+const readCsrf = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
+async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': readCsrf(),
+      ...init?.headers,
+    },
+    ...init,
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || `Request failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+const toMeta = (meta?: { current_page: number; last_page: number; per_page: number; total: number }): PaginationMeta =>
+  meta
+    ? {
+        currentPage: meta.current_page,
+        lastPage: meta.last_page,
+        perPage: meta.per_page,
+        total: meta.total,
+      }
+    : DEFAULT_META;
 
 const getStatus = (client: Client): { status: ClientStatus; daysUntilDue: number } => {
   const today = new Date();
@@ -42,96 +86,91 @@ const getStatus = (client: Client): { status: ClientStatus; daysUntilDue: number
   return { status: 'active', daysUntilDue: days };
 };
 
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
-const today = new Date();
-
-const INITIAL_PAYMENTS: Payment[] = [
-  { id: 'p1', clientId: '1', clientName: 'Juan Carlos Perez', amount: 59.9, date: format(addDays(today, -10), 'yyyy-MM-dd'), period: format(addDays(today, -10), 'MMMM yyyy') },
-];
-
-const readCsrf = () => {
-  const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content;
-  return token ?? '';
-};
-
-async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    credentials: 'same-origin',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-CSRF-TOKEN': readCsrf(),
-      ...init?.headers,
-    },
-    ...init,
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(body || `Request failed: ${res.status}`);
-  }
-
-  return res.json() as Promise<T>;
-}
-
-const getInitialData = (): { payments: Payment[]; notes: Note[] } => {
-  if (typeof window === 'undefined') return { payments: INITIAL_PAYMENTS, notes: [] };
-
-  const stored = localStorage.getItem('gesem-data');
-  if (!stored) return { payments: INITIAL_PAYMENTS, notes: [] };
-
-  try {
-    const data = JSON.parse(stored);
-    return {
-      payments: data.payments || INITIAL_PAYMENTS,
-      notes: data.notes || [],
-    };
-  } catch {
-    return { payments: INITIAL_PAYMENTS, notes: [] };
-  }
-};
-
 export const GestorProvider = ({ children }: { children: ReactNode }) => {
-  const initialData = getInitialData();
   const [rawClients, setRawClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
-  const [payments, setPayments] = useState<Payment[]>(initialData.payments);
-  const [notes, setNotes] = useState<Note[]>(initialData.notes);
+  const [clientsMeta, setClientsMeta] = useState<PaginationMeta>(DEFAULT_META);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [paymentsMeta, setPaymentsMeta] = useState<PaginationMeta>(DEFAULT_META);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const clientsAbortRef = useRef<AbortController | null>(null);
+  const paymentsAbortRef = useRef<AbortController | null>(null);
+  const clientsRequestIdRef = useRef(0);
+  const paymentsRequestIdRef = useRef(0);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gesem-data', JSON.stringify({ payments, notes }));
-    }
-  }, [payments, notes]);
+  const fetchClientsPage = useCallback((page = 1, search = '') => {
+    void (async () => {
+      clientsRequestIdRef.current += 1;
+      const requestId = clientsRequestIdRef.current;
+      clientsAbortRef.current?.abort();
+      const controller = new AbortController();
+      clientsAbortRef.current = controller;
 
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
       try {
         setClientsLoading(true);
-        const response = await apiRequest<ApiResponse<Client[]>>('/api/clients');
-        if (mounted) setRawClients(response.data);
+        const params = new URLSearchParams({
+          page: String(page),
+          per_page: '15',
+        });
+        if (search.trim()) params.set('search', search.trim());
+        const response = await apiRequest<ApiResponse<Client[]>>(`/api/clients?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (requestId !== clientsRequestIdRef.current) return;
+        setRawClients(response.data);
+        setClientsMeta(toMeta(response.meta));
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error('No se pudo cargar clientes', error);
       } finally {
-        if (mounted) setClientsLoading(false);
+        if (requestId === clientsRequestIdRef.current) {
+          setClientsLoading(false);
+        }
       }
     })();
+  }, []);
 
-    return () => {
-      mounted = false;
-    };
+  const fetchPaymentsPage = useCallback((page = 1) => {
+    void (async () => {
+      paymentsRequestIdRef.current += 1;
+      const requestId = paymentsRequestIdRef.current;
+      paymentsAbortRef.current?.abort();
+      const controller = new AbortController();
+      paymentsAbortRef.current = controller;
+
+      try {
+        setPaymentsLoading(true);
+        const response = await apiRequest<ApiResponse<Payment[]>>(`/api/payments?page=${page}&per_page=15`, {
+          signal: controller.signal,
+        });
+        if (requestId !== paymentsRequestIdRef.current) return;
+        setPayments(response.data);
+        setPaymentsMeta(toMeta(response.meta));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error('No se pudo cargar pagos', error);
+      } finally {
+        if (requestId === paymentsRequestIdRef.current) {
+          setPaymentsLoading(false);
+        }
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    fetchClientsPage(1);
+    fetchPaymentsPage(1);
   }, []);
 
   const clients: ClientWithStatus[] = useMemo(
     () =>
-      rawClients.map((c) => {
-        const fallback = getStatus(c);
+      rawClients.map((client) => {
+        const fallback = getStatus(client);
         return {
-          ...c,
-          status: (c as ClientWithStatus).status ?? fallback.status,
-          daysUntilDue: (c as ClientWithStatus).daysUntilDue ?? fallback.daysUntilDue,
+          ...client,
+          status: (client as ClientWithStatus).status ?? fallback.status,
+          daysUntilDue: (client as ClientWithStatus).daysUntilDue ?? fallback.daysUntilDue,
         };
       }),
     [rawClients],
@@ -139,36 +178,36 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
 
   const stats = useMemo(
     () => ({
-      total: clients.length,
+      total: clientsMeta.total,
       active: clients.filter((c) => c.status === 'active').length,
       nearExpiry: clients.filter((c) => c.status === 'near_expiry').length,
       expired: clients.filter((c) => c.status === 'expired').length,
     }),
-    [clients],
+    [clients, clientsMeta.total],
   );
 
-  const addClient = (c: Omit<Client, 'id'>) => {
+  const addClient = (client: Omit<Client, 'id'>) => {
     void (async () => {
       try {
-        const response = await apiRequest<ApiResponse<Client>>('/api/clients', {
+        await apiRequest<ApiResponse<Client>>('/api/clients', {
           method: 'POST',
-          body: JSON.stringify(c),
+          body: JSON.stringify(client),
         });
-        setRawClients((prev) => [response.data, ...prev]);
+        fetchClientsPage(1);
       } catch (error) {
         console.error('No se pudo registrar cliente', error);
       }
     })();
   };
 
-  const updateClient = (c: Client) => {
+  const updateClient = (client: Client) => {
     void (async () => {
       try {
-        const response = await apiRequest<ApiResponse<Client>>(`/api/clients/${c.id}`, {
+        await apiRequest<ApiResponse<Client>>(`/api/clients/${client.id}`, {
           method: 'PUT',
-          body: JSON.stringify(c),
+          body: JSON.stringify(client),
         });
-        setRawClients((prev) => prev.map((p) => (p.id === c.id ? response.data : p)));
+        fetchClientsPage(clientsMeta.currentPage);
       } catch (error) {
         console.error('No se pudo actualizar cliente', error);
       }
@@ -179,8 +218,7 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
     void (async () => {
       try {
         await apiRequest(`/api/clients/${id}`, { method: 'DELETE' });
-        setRawClients((prev) => prev.filter((p) => p.id !== id));
-        setPayments((prev) => prev.filter((p) => p.clientId !== id));
+        fetchClientsPage(clientsMeta.currentPage);
       } catch (error) {
         console.error('No se pudo eliminar cliente', error);
       }
@@ -193,7 +231,7 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
         const response = await apiRequest<ApiResponse<Client>>(`/api/clients/${id}/toggle-service`, {
           method: 'PATCH',
         });
-        setRawClients((prev) => prev.map((p) => (p.id === id ? response.data : p)));
+        setRawClients((prev) => prev.map((item) => (item.id === id ? response.data : item)));
       } catch (error) {
         console.error('No se pudo cambiar estado de servicio', error);
       }
@@ -201,40 +239,52 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addPayment = (clientId: string, amount: number) => {
-    const client = rawClients.find((c) => c.id === clientId);
-    if (!client) return;
-    const newPayment: Payment = {
-      id: uid(),
-      clientId,
-      clientName: client.name,
-      amount,
-      date: format(new Date(), 'yyyy-MM-dd'),
-      period: format(new Date(), 'MMMM yyyy'),
-    };
-    setPayments((prev) => [newPayment, ...prev]);
-    const nextDate = addMonths(parseISO(client.nextPaymentDate), 1);
-    setRawClients((prev) => prev.map((p) => (p.id === clientId ? { ...p, nextPaymentDate: format(nextDate, 'yyyy-MM-dd') } : p)));
+    void (async () => {
+      try {
+        const response = await apiRequest<ApiResponse<Payment>>('/api/payments', {
+          method: 'POST',
+          body: JSON.stringify({ clientId, amount }),
+        });
+
+        setPayments((prev) => [response.data, ...prev].slice(0, 15));
+        setRawClients((prev) =>
+          prev.map((item) =>
+            item.id === clientId
+              ? { ...item, nextPaymentDate: format(addMonths(parseISO(item.nextPaymentDate), 1), 'yyyy-MM-dd') }
+              : item,
+          ),
+        );
+      } catch (error) {
+        console.error('No se pudo registrar pago', error);
+      }
+    })();
   };
 
-  const getClientPayments = (clientId: string) => payments.filter((p) => p.clientId === clientId);
+  const getClientPayments = (clientId: string) => payments.filter((payment) => payment.clientId === clientId);
 
   const addNote = (content: string) => {
-    setNotes((prev) => [{ id: uid(), content, date: format(new Date(), 'yyyy-MM-dd HH:mm') }, ...prev]);
+    const id = `${Date.now()}`;
+    setNotes((prev) => [{ id, content, date: format(new Date(), 'yyyy-MM-dd HH:mm') }, ...prev]);
   };
 
   const deleteNote = (id: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setNotes((prev) => prev.filter((note) => note.id !== id));
   };
 
-  const getAlerts = () => clients.filter((c) => c.status !== 'active').sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  const getAlerts = () => clients.filter((client) => client.status !== 'active').sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 
   return (
     <GestorContext.Provider
       value={{
         clients,
         clientsLoading,
+        clientsMeta,
         payments,
+        paymentsLoading,
+        paymentsMeta,
         notes,
+        fetchClientsPage,
+        fetchPaymentsPage,
         addClient,
         updateClient,
         deleteClient,

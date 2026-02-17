@@ -24,18 +24,49 @@ class ClientController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $clients = $request->user()
-            ->clients()
-            ->latest('id')
-            ->get()
-            ->map(function (Client $client): array {
-                $statusData = $this->statusForClient($client);
+        $perPage = (int) $request->integer('per_page', 15);
+        $perPage = max(1, min(50, $perPage));
+        $search = trim((string) $request->string('search'));
 
-                return $this->serializeClient($client, $statusData['status'], $statusData['days_until_due']);
+        $query = $request->user()
+            ->clients()
+            ->latest('id');
+
+        if ($search !== '') {
+            $query->where(function ($subQuery) use ($search): void {
+                $subQuery->where('name', 'like', "%{$search}%")
+                    ->orWhere('dni', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
+        }
+
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        $clients = collect($paginator->items())->map(function (Client $client): array {
+            $statusData = $this->statusForClient($client);
+
+            return $this->serializeClient($client, $statusData['status'], $statusData['days_until_due']);
+        });
 
         return response()->json([
             'data' => $clients,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    public function show(Request $request, Client $client): JsonResponse
+    {
+        abort_if($client->user_id !== $request->user()->id, 403);
+
+        $statusData = $this->statusForClient($client);
+
+        return response()->json([
+            'data' => $this->serializeClient($client, $statusData['status'], $statusData['days_until_due']),
         ]);
     }
 

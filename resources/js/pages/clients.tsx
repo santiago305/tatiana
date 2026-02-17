@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -12,7 +12,7 @@ import {
   WifiOff,
   Wifi,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,6 @@ const statusClasses: Record<string, string> = {
   expired: 'status-expired',
 };
 
-const PAGE_SIZE = 15;
 const breadcrumbs: BreadcrumbItem[] = [
   {
     title: 'Clientes',
@@ -44,23 +43,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const ClientsContent = () => {
-  const { clients, clientsLoading, deleteClient, toggleService } = useGestor();
+  const { clients, clientsLoading, clientsMeta, fetchClientsPage, deleteClient, toggleService } = useGestor();
+  const { url } = usePage();
+  const initialPage = useMemo(() => {
+    try {
+      return Number(new URL(url, 'http://localhost').searchParams.get('page') || '1');
+    } catch {
+      return 1;
+    }
+  }, [url]);
+  const initialSearch = useMemo(() => {
+    try {
+      return new URL(url, 'http://localhost').searchParams.get('search') || '';
+    } catch {
+      return '';
+    }
+  }, [url]);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(Math.max(1, initialPage));
   const [formOpen, setFormOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [detailClient, setDetailClient] = useState<ClientWithStatus | null>(null);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return clients;
-    const q = search.toLowerCase();
-    return clients.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.dni.includes(q) || c.phone.includes(q),
-    );
-  }, [clients, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, clientsMeta.lastPage);
+  const paginated = clients;
   const paginationItems = useMemo(() => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -77,6 +83,18 @@ const ClientsContent = () => {
     items.push(totalPages);
     return items;
   }, [page, totalPages]);
+
+  useEffect(() => {
+    if (initialSearch) setSearch(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    fetchClientsPage(page, search);
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (search.trim()) params.set('search', search.trim());
+    window.history.replaceState(null, '', `/clients?${params.toString()}`);
+  }, [fetchClientsPage, page, search]);
 
   const handleEdit = (c: ClientWithStatus) => {
     setEditClient(c);
@@ -124,6 +142,46 @@ const ClientsContent = () => {
         </div>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="stat-card overflow-hidden p-0">
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+              <p className="text-[11px] text-muted-foreground">
+                Mostrando {clientsMeta.total === 0 ? 0 : (page - 1) * clientsMeta.perPage + 1}-{Math.min(page * clientsMeta.perPage, clientsMeta.total)} de {clientsMeta.total}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1 rounded-md hover:bg-muted disabled:opacity-30"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                {paginationItems.map((item, idx) =>
+                  item === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="w-7 h-7 inline-flex items-center justify-center text-[11px] text-muted-foreground">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setPage(item)}
+                      className={`w-7 h-7 rounded-md text-[11px] font-medium transition-colors ${
+                        page === item ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1 rounded-md hover:bg-muted disabled:opacity-30"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -139,104 +197,64 @@ const ClientsContent = () => {
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((c) => (
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="py-3 px-4">
-                      <p className="font-medium">{c.name}</p>
-                      <p className="text-xs text-muted-foreground sm:hidden">{c.phone}</p>
-                    </td>
-                    <td className="py-3 px-4 hidden sm:table-cell text-muted-foreground">{c.dni}</td>
-                    <td className="py-3 px-4 hidden md:table-cell text-muted-foreground">{c.phone}</td>
-                    <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground">{c.plan}</td>
-                    <td className="py-3 px-4 hidden lg:table-cell">S/ {c.monthlyAmount.toFixed(2)}</td>
-                    <td className="py-3 px-4">
-                      <Badge className={`${statusClasses[c.status]} border text-xs`}>{statusLabels[c.status]}</Badge>
-                    </td>
-                    <td className="py-3 px-4 hidden md:table-cell">
-                      <button onClick={() => toggleService(c.id)} title={c.isServiceActive ? 'Desactivar' : 'Activar'}>
-                        {c.isServiceActive ? (
-                          <Wifi className="w-4 h-4 text-success" />
-                        ) : (
-                          <WifiOff className="w-4 h-4 text-destructive" />
-                        )}
-                      </button>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setDetailClient(c)} className="p-1.5 rounded-md hover:bg-muted" title="Ver detalles">
-                          <Eye className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => handlePayment(c.id)} className="p-1.5 rounded-md hover:bg-muted" title="Registrar pago">
-                          <CreditCard className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => handleEdit(c)} className="p-1.5 rounded-md hover:bg-muted" title="Editar">
-                          <Edit className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded-md hover:bg-destructive/10" title="Eliminar">
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {clientsLoading && (
+                {clientsLoading ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-muted-foreground">
                       Cargando clientes...
                     </td>
                   </tr>
-                )}
-                {!clientsLoading && paginated.length === 0 && (
+                ) : paginated.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-muted-foreground">
                       {search ? 'No se encontraron clientes' : 'No hay clientes registrados'}
                     </td>
                   </tr>
+                ) : (
+                  paginated.map((c) => (
+                    <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                      <td className="py-3 px-4">
+                        <p className="font-medium">{c.name}</p>
+                        <p className="text-xs text-muted-foreground sm:hidden">{c.phone}</p>
+                      </td>
+                      <td className="py-3 px-4 hidden sm:table-cell text-muted-foreground">{c.dni}</td>
+                      <td className="py-3 px-4 hidden md:table-cell text-muted-foreground">{c.phone}</td>
+                      <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground">{c.plan}</td>
+                      <td className="py-3 px-4 hidden lg:table-cell">S/ {c.monthlyAmount.toFixed(2)}</td>
+                      <td className="py-3 px-4">
+                        <Badge className={`${statusClasses[c.status]} border text-xs`}>{statusLabels[c.status]}</Badge>
+                      </td>
+                      <td className="py-3 px-4 hidden md:table-cell">
+                        <button onClick={() => toggleService(c.id)} title={c.isServiceActive ? 'Desactivar' : 'Activar'}>
+                          {c.isServiceActive ? (
+                            <Wifi className="w-4 h-4 text-success" />
+                          ) : (
+                            <WifiOff className="w-4 h-4 text-destructive" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setDetailClient(c)} className="p-1.5 rounded-md hover:bg-muted" title="Ver detalles">
+                            <Eye className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => handlePayment(c.id)} className="p-1.5 rounded-md hover:bg-muted" title="Registrar pago">
+                            <CreditCard className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => handleEdit(c)} className="p-1.5 rounded-md hover:bg-muted" title="Editar">
+                            <Edit className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded-md hover:bg-destructive/10" title="Eliminar">
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-              <p className="text-xs text-muted-foreground">
-                Mostrando {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded-md hover:bg-muted disabled:opacity-30"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {paginationItems.map((item, idx) =>
-                  item === '...' ? (
-                    <span key={`ellipsis-${idx}`} className="w-8 h-8 inline-flex items-center justify-center text-xs text-muted-foreground">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={item}
-                      onClick={() => setPage(item)}
-                      className={`w-8 h-8 rounded-md text-xs font-medium transition-colors ${
-                        page === item ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ),
-                )}
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="p-1.5 rounded-md hover:bg-muted disabled:opacity-30"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
         </motion.div>
 
         <ClientFormModal

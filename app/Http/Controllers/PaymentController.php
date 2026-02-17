@@ -20,22 +20,35 @@ class PaymentController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $payments = $request->user()
+        $perPage = (int) $request->integer('per_page', 15);
+        $perPage = max(1, min(50, $perPage));
+
+        $paginator = $request->user()
             ->payments()
             ->with('client:id,name')
             ->latest('payment_date')
             ->latest('id')
-            ->get()
-            ->map(fn (Payment $payment): array => [
-                'id' => (string) $payment->id,
-                'clientId' => (string) $payment->client_id,
-                'clientName' => $payment->client?->name ?? '',
-                'amount' => (float) $payment->amount,
-                'date' => $payment->payment_date->toDateString(),
-                'period' => $payment->period_label ?? '',
-            ]);
+            ->paginate($perPage)
+            ->withQueryString();
 
-        return response()->json(['data' => $payments]);
+        $payments = collect($paginator->items())->map(fn (Payment $payment): array => [
+            'id' => (string) $payment->id,
+            'clientId' => (string) $payment->client_id,
+            'clientName' => $payment->client?->name ?? '',
+            'amount' => (float) $payment->amount,
+            'date' => $payment->payment_date->toDateString(),
+            'period' => $payment->period_label ?? '',
+        ]);
+
+        return response()->json([
+            'data' => $payments,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     public function store(StorePaymentRequest $request, RegisterPaymentAction $action): JsonResponse
