@@ -9,8 +9,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import AlertError from './alert-error';
 import { regenerateRecoveryCodes } from '@/routes/two-factor';
+import AlertError from './alert-error';
 
 type Props = {
     recoveryCodesList: string[];
@@ -57,12 +57,12 @@ export default function TwoFactorRecoveryCodes({
             <CardHeader>
                 <CardTitle className="flex gap-3">
                     <LockKeyhole className="size-4" aria-hidden="true" />
-                    Códigos de recuperación 2FA
+                    Cï¿½digos de recuperaciï¿½n 2FA
                 </CardTitle>
                 <CardDescription>
-                    Los códigos de recuperación te permiten volver a acceder si
-                    pierdes tu dispositivo 2FA. Guárdalos en un gestor de
-                    contraseñas seguro.
+                    Los cï¿½digos de recuperaciï¿½n te permiten volver a acceder si
+                    pierdes tu dispositivo 2FA. Guï¿½rdalos en un gestor de
+                    contraseï¿½as seguro.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -77,8 +77,8 @@ export default function TwoFactorRecoveryCodes({
                             className="size-4"
                             aria-hidden="true"
                         />
-                        {codesAreVisible ? 'Ocultar' : 'Ver'} códigos de
-                        recuperación
+                        {codesAreVisible ? 'Ocultar' : 'Ver'} cï¿½digos de
+                        recuperaciï¿½n
                     </Button>
 
                     {canRegenerateCodes && (
@@ -94,7 +94,7 @@ export default function TwoFactorRecoveryCodes({
                                     disabled={processing}
                                     aria-describedby="regenerate-warning"
                                 >
-                                    <RefreshCw /> Regenerar códigos
+                                    <RefreshCw /> Regenerar cï¿½digos
                                 </Button>
                             )}
                         </Form>
@@ -103,7 +103,7 @@ export default function TwoFactorRecoveryCodes({
                 <div
                     id="recovery-codes-section"
                     className={`relative overflow-hidden transition-all duration-300 ${codesAreVisible ? 'h-auto opacity-100' : 'h-0 opacity-0'}`}
-                    aria-hidden={!codesAreVisible}
+                    aria-hidden={codesAreVisible ? 'false' : 'true'}
                 >
                     <div className="mt-3 space-y-3">
                         {errors?.length ? (
@@ -114,7 +114,7 @@ export default function TwoFactorRecoveryCodes({
                                     ref={codesSectionRef}
                                     className="grid gap-1 rounded-lg bg-muted p-4 font-mono text-sm"
                                     role="list"
-                                    aria-label="Códigos de recuperación"
+                                    aria-label="CÃ³digos de recuperaciÃ³n"
                                 >
                                     {recoveryCodesList.length ? (
                                         recoveryCodesList.map((code, index) => (
@@ -129,7 +129,7 @@ export default function TwoFactorRecoveryCodes({
                                     ) : (
                                         <div
                                             className="space-y-2"
-                                            aria-label="Cargando códigos de recuperación"
+                                            role="listitem"
                                         >
                                             {Array.from(
                                                 { length: 8 },
@@ -147,12 +147,12 @@ export default function TwoFactorRecoveryCodes({
 
                                 <div className="text-xs text-muted-foreground select-none">
                                     <p id="regenerate-warning">
-                                        Cada código de recuperación puede usarse
+                                        Cada cï¿½digo de recuperaciï¿½n puede usarse
                                         una sola vez para acceder a tu cuenta y
-                                        se elimina después de usarlo. Si
-                                        necesitas más, haz clic en{' '}
+                                        se elimina despuï¿½s de usarlo. Si
+                                        necesitas mï¿½s, haz clic en{' '}
                                         <span className="font-bold">
-                                            Regenerar códigos
+                                            Regenerar cï¿½digos
                                         </span>{' '}
                                         arriba.
                                     </p>
@@ -165,3 +165,5 @@ export default function TwoFactorRecoveryCodes({
         </Card>
     );
 }
+
+

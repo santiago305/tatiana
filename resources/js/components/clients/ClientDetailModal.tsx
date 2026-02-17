@@ -15,6 +15,15 @@ interface Props {
   client: ClientWithStatus | null;
 }
 
+function InfoRow({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="flex justify-between py-2 border-b border-border last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
+    </div>
+  );
+}
+
 const statusLabels: Record<string, string> = {
   active: 'Activo',
   near_expiry: 'Próximo a vencer',
@@ -34,13 +43,6 @@ export const ClientDetailModal = ({ open, onClose, client }: Props) => {
   if (!client) return null;
 
   const payments = getClientPayments(client.id);
-
-  const InfoRow = ({ label, value }: { label: string; value: string | number }) => (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-foreground">{value}</span>
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>

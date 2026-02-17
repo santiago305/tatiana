@@ -1,33 +1,43 @@
-import { Head } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-import { useState, useMemo } from 'react';
-import { useGestor } from '@/context/GestorContext';
-import { useNavigate } from 'react-router-dom';
+import { router } from '@inertiajs/react';
+import { motion } from 'framer-motion';
+import {
+  Plus,
+  Search,
+  Eye,
+  Edit,
+  Trash2,
+  CreditCard,
+  ChevronLeft,
+  ChevronRight,
+  WifiOff,
+  Wifi,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { ClientFormModal } from '@/components/clients/ClientFormModal';
+import { GestorProvider, useGestor } from '@/context/GestorContext';
+import { dashboard } from '@/routes';
 import { ClientDetailModal } from '@/components/clients/ClientDetailModal';
-import { ClientWithStatus, Client } from '@/types/client';
-import { Plus, Search, Eye, Edit, Trash2, CreditCard, ChevronLeft, ChevronRight, WifiOff, Wifi } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ClientFormModal } from '@/components/clients/ClientFormModal';
+import type { Client, ClientWithStatus } from '@/types/client';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Clientes',
-        href: '/clients',
-    },
-];
+const statusLabels: Record<string, string> = {
+  active: 'Activo',
+  near_expiry: 'Proximo a vencer',
+  expired: 'Vencido',
+};
 
-const statusLabels: Record<string, string> = { active: 'Activo', near_expiry: 'Próximo a vencer', expired: 'Vencido' };
-const statusClasses: Record<string, string> = { active: 'status-active', near_expiry: 'status-near-expiry', expired: 'status-expired' };
+const statusClasses: Record<string, string> = {
+  active: 'status-active',
+  near_expiry: 'status-near-expiry',
+  expired: 'status-expired',
+};
 
 const PAGE_SIZE = 15;
 
-const ClientsPage = () => {
+const ClientsContent = () => {
   const { clients, deleteClient, toggleService } = useGestor();
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
@@ -37,8 +47,8 @@ const ClientsPage = () => {
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
     const q = search.toLowerCase();
-    return clients.filter(c =>
-      c.name.toLowerCase().includes(q) || c.dni.includes(q) || c.phone.includes(q)
+    return clients.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.dni.includes(q) || c.phone.includes(q),
     );
   }, [clients, search]);
 
@@ -51,20 +61,25 @@ const ClientsPage = () => {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de eliminar este cliente?')) {
+    if (confirm('Estas seguro de eliminar este cliente?')) {
       deleteClient(id);
     }
   };
 
   const handlePayment = (clientId: string) => {
-    navigate(`/pagos?clientId=${clientId}`);
+    router.get(dashboard.url({ query: { section: 'pagos', clientId } }));
   };
 
   return (
     <div className="page-container">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-foreground">Clientes</h1>
-        <Button onClick={() => { setEditClient(null); setFormOpen(true); }}>
+        <Button
+          onClick={() => {
+            setEditClient(null);
+            setFormOpen(true);
+          }}
+        >
           <Plus className="w-4 h-4 mr-1.5" />
           Nuevo Cliente
         </Button>
@@ -73,9 +88,12 @@ const ClientsPage = () => {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar por nombre, DNI o teléfono..."
+          placeholder="Buscar por nombre, DNI o telefono..."
           value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
           className="pl-9"
         />
       </div>
@@ -87,7 +105,7 @@ const ClientsPage = () => {
               <tr className="bg-muted/50">
                 <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Cliente</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground hidden sm:table-cell">DNI</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground hidden md:table-cell">Teléfono</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground hidden md:table-cell">Telefono</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground hidden lg:table-cell">Plan</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground hidden lg:table-cell">Monto</th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Estado</th>
@@ -96,7 +114,7 @@ const ClientsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.map(c => (
+              {paginated.map((c) => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="py-3 px-4">
                     <p className="font-medium">{c.name}</p>
@@ -107,9 +125,7 @@ const ClientsPage = () => {
                   <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground">{c.plan}</td>
                   <td className="py-3 px-4 hidden lg:table-cell">S/ {c.monthlyAmount.toFixed(2)}</td>
                   <td className="py-3 px-4">
-                    <Badge className={`${statusClasses[c.status]} border text-xs`}>
-                      {statusLabels[c.status]}
-                    </Badge>
+                    <Badge className={`${statusClasses[c.status]} border text-xs`}>{statusLabels[c.status]}</Badge>
                   </td>
                   <td className="py-3 px-4 hidden md:table-cell">
                     <button onClick={() => toggleService(c.id)} title={c.isServiceActive ? 'Desactivar' : 'Activar'}>
@@ -149,7 +165,6 @@ const ClientsPage = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border">
             <p className="text-xs text-muted-foreground">
@@ -157,7 +172,7 @@ const ClientsPage = () => {
             </p>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="p-1.5 rounded-md hover:bg-muted disabled:opacity-30"
               >
@@ -175,7 +190,7 @@ const ClientsPage = () => {
                 </button>
               ))}
               <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className="p-1.5 rounded-md hover:bg-muted disabled:opacity-30"
               >
@@ -188,7 +203,10 @@ const ClientsPage = () => {
 
       <ClientFormModal
         open={formOpen}
-        onClose={() => { setFormOpen(false); setEditClient(null); }}
+        onClose={() => {
+          setFormOpen(false);
+          setEditClient(null);
+        }}
         editClient={editClient}
       />
       <ClientDetailModal open={!!detailClient} onClose={() => setDetailClient(null)} client={detailClient} />
@@ -196,4 +214,10 @@ const ClientsPage = () => {
   );
 };
 
-export default ClientsPage;
+export default function ClientsPage() {
+  return (
+    <GestorProvider>
+      <ClientsContent />
+    </GestorProvider>
+  );
+}

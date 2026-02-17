@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
-import { Client, Payment, Note, ClientWithStatus, ClientStatus } from '@/types/client';
 import { addMonths, format, differenceInDays, parseISO, addDays } from 'date-fns';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import type { Client, Payment, Note, ClientWithStatus, ClientStatus } from '@/types/client';
 
 interface GestorContextType {
   clients: ClientWithStatus[];
@@ -110,36 +111,39 @@ const INITIAL_PAYMENTS: Payment[] = [
   { id: 'p5', clientId: '5', clientName: 'Pedro Sánchez Huamán', amount: 89.90, date: format(addDays(today, -15), 'yyyy-MM-dd'), period: format(addDays(today, -15), 'MMMM yyyy') },
 ];
 
+const getInitialData = (): { clients: Client[]; payments: Payment[]; notes: Note[] } => {
+  if (typeof window === 'undefined') {
+    return { clients: INITIAL_CLIENTS, payments: INITIAL_PAYMENTS, notes: [] };
+  }
+
+  const stored = localStorage.getItem('gesem-data');
+
+  if (!stored) {
+    return { clients: INITIAL_CLIENTS, payments: INITIAL_PAYMENTS, notes: [] };
+  }
+
+  try {
+    const data = JSON.parse(stored);
+    return {
+      clients: data.clients || INITIAL_CLIENTS,
+      payments: data.payments || INITIAL_PAYMENTS,
+      notes: data.notes || [],
+    };
+  } catch {
+    return { clients: INITIAL_CLIENTS, payments: INITIAL_PAYMENTS, notes: [] };
+  }
+};
 export const GestorProvider = ({ children }: { children: ReactNode }) => {
-  const [rawClients, setRawClients] = useState<Client[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const initialData = getInitialData();
+  const [rawClients, setRawClients] = useState<Client[]>(initialData.clients);
+  const [payments, setPayments] = useState<Payment[]>(initialData.payments);
+  const [notes, setNotes] = useState<Note[]>(initialData.notes);
 
   useEffect(() => {
-    const stored = localStorage.getItem('gesem-data');
-    if (stored) {
-      try {
-        const data = JSON.parse(stored);
-        setRawClients(data.clients || []);
-        setPayments(data.payments || []);
-        setNotes(data.notes || []);
-      } catch {
-        setRawClients(INITIAL_CLIENTS);
-        setPayments(INITIAL_PAYMENTS);
-      }
-    } else {
-      setRawClients(INITIAL_CLIENTS);
-      setPayments(INITIAL_PAYMENTS);
-    }
-    setLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (loaded) {
+    if (typeof window !== 'undefined') {
       localStorage.setItem('gesem-data', JSON.stringify({ clients: rawClients, payments, notes }));
     }
-  }, [rawClients, payments, notes, loaded]);
+  }, [rawClients, payments, notes]);
 
   const clients: ClientWithStatus[] = useMemo(
     () => rawClients.map(c => {
@@ -204,8 +208,6 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
 
   const getAlerts = () => clients.filter(c => c.status !== 'active').sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 
-  if (!loaded) return null;
-
   return (
     <GestorContext.Provider value={{
       clients, payments, notes, addClient, updateClient, deleteClient,
@@ -215,3 +217,4 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
     </GestorContext.Provider>
   );
 };
+
