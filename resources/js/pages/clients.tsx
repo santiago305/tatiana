@@ -44,7 +44,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const ClientsContent = () => {
-  const { clients, deleteClient, toggleService } = useGestor();
+  const { clients, clientsLoading, deleteClient, toggleService } = useGestor();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
@@ -61,6 +61,22 @@ const ClientsContent = () => {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginationItems = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const items: Array<number | '...'> = [1];
+    const start = Math.max(2, page - 1);
+    const end = Math.min(totalPages - 1, page + 1);
+
+    if (start > 2) items.push('...');
+    for (let i = start; i <= end; i += 1) items.push(i);
+    if (end < totalPages - 1) items.push('...');
+
+    items.push(totalPages);
+    return items;
+  }, [page, totalPages]);
 
   const handleEdit = (c: ClientWithStatus) => {
     setEditClient(c);
@@ -163,7 +179,14 @@ const ClientsContent = () => {
                     </td>
                   </tr>
                 ))}
-                {paginated.length === 0 && (
+                {clientsLoading && (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                      Cargando clientes...
+                    </td>
+                  </tr>
+                )}
+                {!clientsLoading && paginated.length === 0 && (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-muted-foreground">
                       {search ? 'No se encontraron clientes' : 'No hay clientes registrados'}
@@ -187,17 +210,23 @@ const ClientsContent = () => {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i + 1)}
-                    className={`w-8 h-8 rounded-md text-xs font-medium transition-colors ${
-                      page === i + 1 ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
+                {paginationItems.map((item, idx) =>
+                  item === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="w-8 h-8 inline-flex items-center justify-center text-xs text-muted-foreground">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setPage(item)}
+                      className={`w-8 h-8 rounded-md text-xs font-medium transition-colors ${
+                        page === item ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ),
+                )}
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}

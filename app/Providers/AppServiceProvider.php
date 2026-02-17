@@ -2,6 +2,15 @@
 
 namespace App\Providers;
 
+use App\Actions\Clients\CreateClientAction;
+use App\Actions\Clients\DeleteClientAction;
+use App\Actions\Clients\ToggleClientServiceAction;
+use App\Actions\Clients\UpdateClientAction;
+use App\Actions\Dashboard\GetDashboardDataAction;
+use App\Actions\Notes\CreateNoteAction;
+use App\Actions\Notes\DeleteNoteAction;
+use App\Actions\Notifications\BuildNotificationMessageAction;
+use App\Actions\Payments\RegisterPaymentAction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +24,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(CreateClientAction::class);
+        $this->app->singleton(UpdateClientAction::class);
+        $this->app->singleton(DeleteClientAction::class);
+        $this->app->singleton(ToggleClientServiceAction::class);
+        $this->app->singleton(RegisterPaymentAction::class);
+        $this->app->singleton(CreateNoteAction::class);
+        $this->app->singleton(DeleteNoteAction::class);
+        $this->app->singleton(GetDashboardDataAction::class);
+        $this->app->singleton(BuildNotificationMessageAction::class);
     }
 
     /**

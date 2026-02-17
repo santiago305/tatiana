@@ -136,7 +136,7 @@ export const ClientFormModal = ({ open, onClose, editClient }: Props) => {
       coordinates: data.coordinates || '',
       reference: data.reference || '',
       nextPaymentDate: data.nextPaymentDate,
-      isServiceActive: true,
+      isServiceActive: editClient?.isServiceActive ?? true,
     };
     if (editClient) {
       updateClient({ ...editClient, ...clientData });
