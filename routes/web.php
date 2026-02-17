@@ -33,6 +33,7 @@ Route::middleware(['auth'])->group(function (): void {
     Route::delete('api/notes/{note}', [NoteController::class, 'destroy'])->name('api.notes.destroy');
 
     Route::get('notificaciones', [NotificationController::class, 'page'])->name('notificaciones');
+    Route::get('api/notifications/alerts', [NotificationController::class, 'alerts'])->name('api.notifications.alerts');
     Route::post('api/notifications/send', [NotificationController::class, 'send'])->name('api.notifications.send');
 });
 
