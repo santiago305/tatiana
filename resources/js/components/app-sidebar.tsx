@@ -34,7 +34,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Notificaciones',
-        href: dashboard({ query: { section: 'notificaciones' } }),
+        href: '/notificaciones',
         icon: Bell,
     },
 ];
@@ -48,30 +48,32 @@ export function AppSidebar() {
             variant="inset"
             className="group-data-[variant=inset]:p-3"
         >
-            <SidebarHeader className="rounded-2xl border border-sidebar-border bg-white/95 p-3 shadow-sm">
+            <SidebarHeader >
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             size="lg"
                             asChild
-                            className="h-14 rounded-xl"
+                            className="h-14 rounded-xl group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
                         >
                             <Link href={dashboard()} prefetch>
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
                                     <Wifi className="h-4 w-4" />
                                 </div>
-                                <AppLogo />
+                                <div className="group-data-[collapsible=icon]:hidden">
+                                    <AppLogo />
+                                </div>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent className="mt-3 rounded-2xl border border-sidebar-border bg-white p-2 shadow-sm">
+            <SidebarContent>
                 <NavMain items={mainNavItems} />
             </SidebarContent>
 
-            <SidebarFooter className="mt-3 rounded-2xl border border-sidebar-border bg-white p-2 shadow-sm">
+            <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>

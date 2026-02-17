@@ -13,7 +13,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     const { isCurrentUrl } = useCurrentUrl();
 
     return (
-        <SidebarGroup className="px-1 py-2">
+        <SidebarGroup className="">
             <SidebarGroupLabel className="px-2 pb-2 text-[11px] font-semibold tracking-[0.12em] text-orange-400 uppercase">
                 Menu
             </SidebarGroupLabel>

@@ -21,4 +21,8 @@ Route::get('pagos', function () {
     return Inertia::render('Payments');
 })->middleware(['auth'])->name('pagos');
 
+Route::get('notificaciones', function () {
+    return Inertia::render('Notifications');
+})->middleware(['auth'])->name('notificaciones');
+
 require __DIR__.'/settings.php';
