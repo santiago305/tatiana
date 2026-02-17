@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useGestor } from '@/context/GestorContext';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Client } from '@/types/client';
 
 const schema = z.object({
@@ -154,7 +153,7 @@ export const ClientFormModal = ({ open, onClose, editClient }: Props) => {
         <DialogHeader className="p-6 pb-2">
           <DialogTitle>{editClient ? 'Editar Cliente' : 'Nuevo Cliente'}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh] px-6 pb-6">
+        <div className="soft-scrollbar max-h-[70vh] overflow-y-auto px-6 pb-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-3">Informacion Personal</h3>
@@ -207,7 +206,7 @@ export const ClientFormModal = ({ open, onClose, editClient }: Props) => {
               <Button type="submit">{editClient ? 'Guardar Cambios' : 'Registrar Cliente'}</Button>
             </div>
           </form>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
