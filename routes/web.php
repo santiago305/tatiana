@@ -13,4 +13,8 @@ Route::get('dashboard', function () {
     return Inertia::render('dashboard');
 })->middleware(['auth'])->name('dashboard');
 
+Route::get('clients', function () {
+    return Inertia::render('clients');
+})->middleware(['auth'])->name('clients');
+
 require __DIR__.'/settings.php';

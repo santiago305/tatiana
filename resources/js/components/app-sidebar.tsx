@@ -24,7 +24,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Clientes',
-        href: dashboard({ query: { section: 'clientes' } }),
+        href: '/clients',
         icon: Users,
     },
     {
