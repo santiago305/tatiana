@@ -105,7 +105,17 @@ function DashboardContent({
     window.open(`https://wa.me/51${client.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  const readCsrf = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+  const readCsrf = () => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content;
+    if (meta) return meta;
+
+    const cookie = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('XSRF-TOKEN='))
+      ?.split('=')[1];
+
+    return cookie ? decodeURIComponent(cookie) : '';
+  };
 
   const createNote = async () => {
     const content = noteText.trim();
@@ -118,6 +128,7 @@ function DashboardContent({
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': readCsrf(),
         },
         body: JSON.stringify({ content }),
@@ -140,6 +151,7 @@ function DashboardContent({
         credentials: 'same-origin',
         headers: {
           Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': readCsrf(),
         },
       });
@@ -167,6 +179,7 @@ function DashboardContent({
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': readCsrf(),
         },
         body: JSON.stringify({ content }),
