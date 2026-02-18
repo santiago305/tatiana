@@ -1,13 +1,14 @@
 import { Head, router } from '@inertiajs/react';
-import { format, parseISO, startOfWeek, startOfMonth, startOfYear, isAfter } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion } from 'framer-motion';
-import { Users, CheckCircle, Clock, AlertTriangle, Plus, Send, Trash2, Eye } from 'lucide-react';
+import { Users, CheckCircle, Clock, AlertTriangle, Plus, Send, Trash2, Eye, Pencil } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { GestorProvider, useGestor } from '@/context/GestorContext';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
@@ -27,52 +28,165 @@ const statusClasses: Record<string, string> = { active: 'status-active', near_ex
 
 const PIE_COLORS = ['#22c55e', '#f59e0b', '#ef4444'];
 
-function DashboardContent() {
-  const { clients, payments, notes, stats, getAlerts, addNote, deleteNote } = useGestor();
+type DashboardStats = {
+  total: number;
+  active: number;
+  near_expiry: number;
+  expired: number;
+};
+
+type DashboardIncome = {
+  period: 'weekly' | 'monthly' | 'annual';
+  total: number;
+  chart: Array<{ date: string; amount: number }>;
+};
+
+type DashboardAlert = {
+  id: string;
+  name: string;
+  phone: string;
+  plan: string;
+  speed: string;
+  monthlyAmount: number;
+  nextPaymentDate: string;
+  status: 'near_expiry' | 'expired' | 'active';
+  daysUntilDue: number;
+};
+
+function DashboardContent({
+  backendStats,
+  backendIncome,
+  backendAlerts,
+  backendAlertsTotal,
+  backendNotes,
+}: {
+  backendStats?: DashboardStats;
+  backendIncome?: DashboardIncome;
+  backendAlerts?: DashboardAlert[];
+  backendAlertsTotal?: number;
+  backendNotes?: Array<{ id: string; content: string; date: string }>;
+}) {
+  const { clients, stats } = useGestor();
   const [noteText, setNoteText] = useState('');
   const [detailClient, setDetailClient] = useState<ClientWithStatus | null>(null);
-  const [incomePeriod, setIncomePeriod] = useState<'weekly' | 'monthly' | 'annual'>('monthly');
-  const alerts = getAlerts();
+  const [incomePeriod, setIncomePeriod] = useState<'weekly' | 'monthly' | 'annual'>(backendIncome?.period ?? 'monthly');
+  const [notes, setNotes] = useState<Array<{ id: string; content: string; date: string }>>(backendNotes ?? []);
+  const [notePreview, setNotePreview] = useState<{ content: string; date: string } | null>(null);
+  const [editingNote, setEditingNote] = useState<{ id: string; content: string } | null>(null);
+  const [editText, setEditText] = useState('');
+  const alerts = backendAlerts ?? [];
+  const alertsTotal = backendAlertsTotal ?? alerts.length;
+  const topStats = {
+    total: backendStats?.total ?? stats.total,
+    active: backendStats?.active ?? stats.active,
+    nearExpiry: backendStats?.near_expiry ?? stats.nearExpiry,
+    expired: backendStats?.expired ?? stats.expired,
+  };
 
   const pieData = [
-    { name: 'Activos', value: stats.active },
-    { name: 'Próximos', value: stats.nearExpiry },
-    { name: 'Vencidos', value: stats.expired },
+    { name: 'Activos', value: topStats.active },
+    { name: 'Próximos', value: topStats.nearExpiry },
+    { name: 'Vencidos', value: topStats.expired },
   ];
 
-  const incomeData = useMemo(() => {
-    const now = new Date();
-    let start: Date;
-    if (incomePeriod === 'weekly') start = startOfWeek(now, { locale: es });
-    else if (incomePeriod === 'monthly') start = startOfMonth(now);
-    else start = startOfYear(now);
+  const incomeData = backendIncome ?? { period: incomePeriod, total: 0, chart: [] };
 
-    const filtered = payments.filter(p => isAfter(parseISO(p.date), start));
-    const total = filtered.reduce((sum, p) => sum + p.amount, 0);
+  const handleIncomePeriodChange = (period: 'weekly' | 'monthly' | 'annual') => {
+    setIncomePeriod(period);
+    router.get(
+      dashboard().url,
+      { period },
+      { preserveState: true, preserveScroll: true, replace: true },
+    );
+  };
 
-    // Group by date for chart
-    const grouped: Record<string, number> = {};
-    filtered.forEach(p => {
-      const key = format(parseISO(p.date), 'dd/MM');
-      grouped[key] = (grouped[key] || 0) + p.amount;
-    });
-
-    return {
-      total,
-      chart: Object.entries(grouped).map(([date, amount]) => ({ date, amount })),
-    };
-  }, [payments, incomePeriod]);
-
-  const sendWhatsApp = (client: ClientWithStatus) => {
+  const sendWhatsApp = (client: DashboardAlert) => {
     const msg = `Hola ${client.name}, le recordamos que su servicio de internet (${client.plan} - ${client.speed}) tiene fecha de pago próxima. Monto: S/ ${client.monthlyAmount.toFixed(2)}. Gracias por su preferencia - GESEM`;
     window.open(`https://wa.me/51${client.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  const readCsrf = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
+  const createNote = async () => {
+    const content = noteText.trim();
+    if (!content) return;
+
+    try {
+      const response = await fetch('/api/notes', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': readCsrf(),
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) return;
+      const payload = (await response.json()) as { data: { id: string; content: string; date: string } };
+      if (!payload?.data) return;
+      setNotes((prev) => [payload.data, ...prev]);
+      setNoteText('');
+    } catch (error) {
+      console.error('No se pudo crear la nota', error);
+    }
+  };
+
+  const removeNote = async (id: string) => {
+    try {
+      const response = await fetch(`/api/notes/${id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': readCsrf(),
+        },
+      });
+      if (!response.ok) return;
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+    } catch (error) {
+      console.error('No se pudo eliminar la nota', error);
+    }
+  };
+
+  const startEditNote = (note: { id: string; content: string }) => {
+    setEditingNote(note);
+    setEditText(note.content);
+  };
+
+  const saveEditNote = async () => {
+    if (!editingNote) return;
+    const content = editText.trim();
+    if (!content) return;
+
+    try {
+      const response = await fetch(`/api/notes/${editingNote.id}`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': readCsrf(),
+        },
+        body: JSON.stringify({ content }),
+      });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { data: { id: string; content: string; date: string } };
+      if (!payload?.data) return;
+      setNotes((prev) => prev.map((n) => (n.id === payload.data.id ? payload.data : n)));
+      setEditingNote(null);
+      setEditText('');
+    } catch (error) {
+      console.error('No se pudo editar la nota', error);
+    }
+  };
+
   const statCards = [
-    { label: 'Total Clientes', value: stats.total, icon: Users, color: 'bg-primary/10 text-primary' },
-    { label: 'Activos', value: stats.active, icon: CheckCircle, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Próximos a vencer', value: stats.nearExpiry, icon: Clock, color: 'bg-amber-50 text-amber-600' },
-    { label: 'Vencidos', value: stats.expired, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
+    { label: 'Total Clientes', value: topStats.total, icon: Users, color: 'bg-primary/10 text-primary' },
+    { label: 'Activos', value: topStats.active, icon: CheckCircle, color: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Próximos a vencer', value: topStats.nearExpiry, icon: Clock, color: 'bg-amber-50 text-amber-600' },
+    { label: 'Vencidos', value: topStats.expired, icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
   ];
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -140,7 +254,7 @@ function DashboardContent() {
                 {(['weekly', 'monthly', 'annual'] as const).map(p => (
                   <button
                     key={p}
-                    onClick={() => setIncomePeriod(p)}
+                    onClick={() => handleIncomePeriodChange(p)}
                     className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
                       incomePeriod === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
                     }`}
@@ -169,7 +283,7 @@ function DashboardContent() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Alerts */}
           <div className="stat-card">
-            <h3 className="text-sm font-semibold mb-3">Alertas ({alerts.length})</h3>
+            <h3 className="text-sm font-semibold mb-3">Alertas ({alertsTotal})</h3>
             <div className="space-y-2 max-h-64 overflow-auto">
               {alerts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Sin alertas pendientes</p>
@@ -210,15 +324,14 @@ function DashboardContent() {
                 onChange={e => setNoteText(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && noteText.trim()) {
-                    addNote(noteText.trim());
-                    setNoteText('');
+                    void createNote();
                   }
                 }}
                 className="h-9 text-sm"
               />
               <Button
                 size="sm"
-                onClick={() => { if (noteText.trim()) { addNote(noteText.trim()); setNoteText(''); } }}
+                onClick={() => { void createNote(); }}
                 disabled={!noteText.trim()}
               >
                 <Plus className="w-4 h-4" />
@@ -227,13 +340,20 @@ function DashboardContent() {
             <div className="space-y-2 max-h-48 overflow-auto">
               {notes.map(n => (
                 <div key={n.id} className="flex items-start justify-between p-2.5 rounded-lg bg-muted/50 gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm">{n.content}</p>
+                  <div className="min-w-0 flex-1">
+                    <button onClick={() => setNotePreview({ content: n.content, date: n.date })} className="w-full text-left">
+                      <p className="text-sm truncate">{n.content}</p>
+                    </button>
                     <p className="text-xs text-muted-foreground mt-0.5">{n.date}</p>
                   </div>
-                  <button onClick={() => deleteNote(n.id)} className="p-1 text-muted-foreground hover:text-destructive">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => startEditNote(n)} className="p-1 text-muted-foreground hover:text-primary">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => { void removeNote(n.id); }} className="p-1 text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -284,15 +404,58 @@ function DashboardContent() {
         </div>
 
         <ClientDetailModal open={!!detailClient} onClose={() => setDetailClient(null)} client={detailClient} />
+
+        <Dialog open={!!notePreview} onOpenChange={(v) => { if (!v) setNotePreview(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Detalle de Nota</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm whitespace-pre-wrap">{notePreview?.content}</p>
+            <p className="text-xs text-muted-foreground">{notePreview?.date}</p>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingNote} onOpenChange={(v) => { if (!v) setEditingNote(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Editar Nota</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Input value={editText} onChange={(e) => setEditText(e.target.value)} />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditingNote(null)}>Cancelar</Button>
+                <Button onClick={() => { void saveEditNote(); }} disabled={!editText.trim()}>Guardar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({
+  backendData,
+}: {
+  backendData?: {
+    stats?: DashboardStats;
+    income?: DashboardIncome;
+    alerts?: DashboardAlert[];
+    alerts_total?: number;
+    notes?: Array<{ id: string; content: string; date: string }>;
+  };
+}) {
   return (
     <GestorProvider>
-      <DashboardContent />
+      <DashboardContent
+        backendStats={backendData?.stats}
+        backendIncome={backendData?.income}
+        backendAlerts={backendData?.alerts}
+        backendAlertsTotal={backendData?.alerts_total}
+        backendNotes={backendData?.notes}
+      />
     </GestorProvider>
   );
 }
+
+

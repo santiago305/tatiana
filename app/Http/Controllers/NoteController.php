@@ -39,6 +39,23 @@ class NoteController extends Controller
         ], 201);
     }
 
+    public function update(StoreNoteRequest $request, Note $note): JsonResponse
+    {
+        abort_if($note->user_id !== $request->user()->id, 403);
+
+        $note->update([
+            'content' => $request->string('content')->toString(),
+        ]);
+
+        return response()->json([
+            'data' => [
+                'id' => (string) $note->id,
+                'content' => $note->content,
+                'date' => $note->note_date->format('Y-m-d H:i'),
+            ],
+        ]);
+    }
+
     public function destroy(Request $request, Note $note, DeleteNoteAction $action): JsonResponse
     {
         abort_if($note->user_id !== $request->user()->id, 403);
