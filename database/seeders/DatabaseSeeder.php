@@ -14,14 +14,14 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         User::query()->updateOrCreate(
-            ['email' => 'minecratf633@gmail.com'],
+            ['email' => 'administracion@gesemperu.com'],
             [
-                'name' => 'santiago',
-                'password' => Hash::make('123123123'),
+                'name' => 'Tatiana',
+                'password' => Hash::make('12345678'),
             ]
         );
 
-        $this->call(MassiveClientsSeeder::class);
-        $this->call(MassivePaymentsSeeder::class);
+        // $this->call(MassiveClientsSeeder::class);
+        // $this->call(MassivePaymentsSeeder::class);
     }
 }
