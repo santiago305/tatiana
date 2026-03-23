@@ -130,12 +130,8 @@ function NotificationsContent() {
   const sendWhatsApp = (client: NotificationAlert) => {
     const msg =
       client.status === 'expired'
-        ? `Hola ${client.name}, le informamos que su servicio de internet (${client.plan}) ha vencido. Su pago de S/ ${client.monthlyAmount.toFixed(
-            2,
-          )} está pendiente. Por favor regularice su situación para evitar la suspensión. - GESEM`
-        : `Hola ${client.name}, le recordamos que su servicio de internet (${client.plan} - ${
-            client.speed
-          }) vence el ${format(parseISO(client.nextPaymentDate), 'dd/MM/yyyy')}. Monto: S/ ${client.monthlyAmount.toFixed(2)}. Gracias - GESEM`;
+        ? `Estimado ${client.name}, le recordamos que tiene un pago vencido del servicio de internet , recomendamos que proceda con el corte de servicio por falta de pago. Derivar el comprobante por este medio.`
+        : `Estimado ${client.name},  le recordamos que tiene un pago próximo a vencer del servicio de internet , recomendamos que proceda con el pago a fin de mantenerse conectado. Derivar el comprobante por este medio. vence el ${format(parseISO(client.nextPaymentDate), 'dd/MM/yyyy')}.`
 
     void sendNotification(client, 'whatsapp', msg);
     window.open(`https://wa.me/51${client.phone}?text=${encodeURIComponent(msg)}`, '_blank');
