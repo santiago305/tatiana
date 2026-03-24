@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateClientRequest extends FormRequest
 {
@@ -38,18 +37,9 @@ class UpdateClientRequest extends FormRequest
      */
     public function rules(): array
     {
-        $clientId = $this->route('client')?->id;
-
         return [
             'name' => ['required', 'string', 'max:100'],
-            'dni' => [
-                'required',
-                'string',
-                'max:20',
-                Rule::unique('clients', 'dni')
-                    ->where(fn ($query) => $query->where('user_id', $this->user()->id))
-                    ->ignore($clientId),
-            ],
+            'dni' => ['required', 'string', 'max:20'],
             'phone' => ['required', 'string', 'max:20'],
             'ip' => ['required', 'string', 'max:50'],
             'install_date' => ['required', 'date'],
@@ -77,7 +67,6 @@ class UpdateClientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'dni.unique' => 'Este DNI ya existe para tu cuenta.',
             'monthly_amount.min' => 'El monto debe ser mayor a 0.',
         ];
     }

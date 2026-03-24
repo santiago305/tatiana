@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreClientRequest extends FormRequest
 {
@@ -40,12 +39,7 @@ class StoreClientRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'dni' => [
-                'required',
-                'string',
-                'max:20',
-                Rule::unique('clients', 'dni')->where(fn ($query) => $query->where('user_id', $this->user()->id)),
-            ],
+            'dni' => ['required', 'string', 'max:20'],
             'phone' => ['required', 'string', 'max:20'],
             'ip' => ['required', 'string', 'max:50'],
             'install_date' => ['required', 'date'],
@@ -75,7 +69,6 @@ class StoreClientRequest extends FormRequest
         return [
             'name.required' => 'El nombre es obligatorio.',
             'dni.required' => 'El DNI es obligatorio.',
-            'dni.unique' => 'Este DNI ya existe para tu cuenta.',
             'monthly_amount.min' => 'El monto debe ser mayor a 0.',
             'install_date.required' => 'La fecha de instalación es obligatoria.',
             'next_payment_date.required' => 'La fecha de próximo pago es obligatoria.',
