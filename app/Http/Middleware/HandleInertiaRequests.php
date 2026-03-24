@@ -38,6 +38,9 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'settings' => [
+                'nearExpiryDays' => config('business.near_expiry_days'),
+            ],
             'auth' => [
                 'user' => $request->user(),
             ],

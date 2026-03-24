@@ -118,7 +118,8 @@ class ClientController extends Controller
     private function statusForClient(Client $client): array
     {
         $days = CarbonImmutable::today()->diffInDays($client->next_payment_date, false);
-        $status = $days < 0 ? 'expired' : ($days <= 4 ? 'near_expiry' : 'active');
+        $nearExpiryDays = (int) config('business.near_expiry_days', 7);
+        $status = $days < 0 ? 'expired' : ($days <= $nearExpiryDays ? 'near_expiry' : 'active');
 
         return [
             'status' => $status,

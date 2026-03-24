@@ -11,7 +11,8 @@ class GetDashboardDataAction
     public function execute(User $user, string $period = 'monthly'): array
     {
         $today = CarbonImmutable::today();
-        $nearExpiryLimit = $today->addDays(4);
+        $nearExpiryDays = (int) config('business.near_expiry_days', 7);
+        $nearExpiryLimit = $today->addDays($nearExpiryDays);
 
         $clientsBaseQuery = $user->clients();
         $total = (clone $clientsBaseQuery)->count();
@@ -28,9 +29,9 @@ class GetDashboardDataAction
         $payments = $user->payments()->latest('payment_date')->get();
         $notes = $user->notes()->latest('note_date')->get();
 
-        $statusMap = $clients->map(function ($client) use ($today) {
+        $statusMap = $clients->map(function ($client) use ($today, $nearExpiryDays) {
             $daysUntilDue = $today->diffInDays($client->next_payment_date, false);
-            $status = $daysUntilDue < 0 ? 'expired' : ($daysUntilDue <= 4 ? 'near_expiry' : 'active');
+            $status = $daysUntilDue < 0 ? 'expired' : ($daysUntilDue <= $nearExpiryDays ? 'near_expiry' : 'active');
 
             return [
                 'id' => $client->id,

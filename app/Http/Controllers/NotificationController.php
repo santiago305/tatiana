@@ -21,7 +21,7 @@ class NotificationController extends Controller
     public function alerts(Request $request): JsonResponse
     {
         $today = CarbonImmutable::today();
-        $threshold = $today->addDays(4);
+        $threshold = $today->addDays((int) config('business.near_expiry_days', 7));
         $perPage = (int) $request->integer('per_page', 15);
         $perPage = max(1, min(50, $perPage));
 

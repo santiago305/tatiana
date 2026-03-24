@@ -1,4 +1,5 @@
 import { addMonths, differenceInDays, format, parseISO } from 'date-fns';
+import { usePage } from '@inertiajs/react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Client, ClientStatus, ClientWithStatus, Note, Payment } from '@/types/client';
@@ -76,17 +77,19 @@ const toMeta = (meta?: { current_page: number; last_page: number; per_page: numb
       }
     : DEFAULT_META;
 
-const getStatus = (client: Client): { status: ClientStatus; daysUntilDue: number } => {
+const getStatus = (client: Client, nearExpiryDays: number): { status: ClientStatus; daysUntilDue: number } => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = parseISO(client.nextPaymentDate);
   const days = differenceInDays(due, today);
   if (days < 0) return { status: 'expired', daysUntilDue: days };
-  if (days <= 4) return { status: 'near_expiry', daysUntilDue: days };
+  if (days <= nearExpiryDays) return { status: 'near_expiry', daysUntilDue: days };
   return { status: 'active', daysUntilDue: days };
 };
 
 export const GestorProvider = ({ children }: { children: ReactNode }) => {
+  const { props } = usePage<{ settings?: { nearExpiryDays?: number } }>();
+  const nearExpiryDays = props.settings?.nearExpiryDays ?? 7;
   const [rawClients, setRawClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [clientsMeta, setClientsMeta] = useState<PaginationMeta>(DEFAULT_META);
@@ -166,14 +169,14 @@ export const GestorProvider = ({ children }: { children: ReactNode }) => {
   const clients: ClientWithStatus[] = useMemo(
     () =>
       rawClients.map((client) => {
-        const fallback = getStatus(client);
+        const fallback = getStatus(client, nearExpiryDays);
         return {
           ...client,
           status: (client as ClientWithStatus).status ?? fallback.status,
           daysUntilDue: (client as ClientWithStatus).daysUntilDue ?? fallback.daysUntilDue,
         };
       }),
-    [rawClients],
+    [nearExpiryDays, rawClients],
   );
 
   const stats = useMemo(
