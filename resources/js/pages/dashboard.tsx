@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { GestorProvider, useGestor } from '@/context/GestorContext';
+import { buildWhatsAppNotificationMessage } from '@/lib/notification-messages';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
@@ -101,7 +102,7 @@ function DashboardContent({
   };
 
   const sendWhatsApp = (client: DashboardAlert) => {
-    const msg = `Hola ${client.name}, le recordamos que su servicio de internet (${client.plan} - ${client.speed}) tiene fecha de pago próxima. Monto: S/ ${client.monthlyAmount.toFixed(2)}. Gracias por su preferencia - GESEM`;
+    const msg = buildWhatsAppNotificationMessage(client);
     window.open(`https://wa.me/51${client.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -470,5 +471,4 @@ export default function Dashboard({
     </GestorProvider>
   );
 }
-
 

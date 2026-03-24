@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Clock, MessageCircle, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { buildWhatsAppNotificationMessage } from '@/lib/notification-messages';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -128,11 +129,7 @@ function NotificationsContent() {
   };
 
   const sendWhatsApp = (client: NotificationAlert) => {
-    const msg =
-      client.status === 'expired'
-        ? `Estimado ${client.name}, le recordamos que tiene un pago vencido del servicio de internet , recomendamos que proceda con el corte de servicio por falta de pago. Derivar el comprobante por este medio.`
-        : `Estimado ${client.name},  le recordamos que tiene un pago próximo a vencer del servicio de internet , recomendamos que proceda con el pago a fin de mantenerse conectado. Derivar el comprobante por este medio. vence el ${format(parseISO(client.nextPaymentDate), 'dd/MM/yyyy')}.`
-
+    const msg = buildWhatsAppNotificationMessage(client);
     void sendNotification(client, 'whatsapp', msg);
     window.open(`https://wa.me/51${client.phone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
